@@ -1,0 +1,5 @@
+rootProject.name = 'boot-rest_'
+
+include 'rest-web'
+include 'data-rest'
+

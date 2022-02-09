@@ -45,7 +45,7 @@ public class BoardRestController {
     @PostMapping
     public ResponseEntity<?> postBoard(@RequestBody Board board) {
         //valid 체크
-        //board.setcreatedDate();
+        board.setCreatedDateNow();
         boardRepository.save(board);
         return new ResponseEntity<>("{}", HttpStatus.CREATED);
     }

@@ -1,58 +1,77 @@
 package com.community.rest;
 
-import com.web.domain.Board;
-import com.web.domain.User;
-import com.web.domain.enums.BoardType;
-import com.web.repository.BoardRepository;
-import com.web.repository.UserRepository;
-import com.web.resolver.UserArgumentResolver;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.CommandLineRunner;
+import com.community.rest.event.BoardEventHandler;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.IntStream;
 
 @SpringBootApplication
-public class DataRestApplication extends WebMvcConfigurerAdapter {
-
-    @Autowired
-    private UserArgumentResolver userArgumentResolver;
+public class DataRestApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(RestWebApplication.class, args);
+        SpringApplication.run(DataRestApplication.class, args);
     }
 
-    @Override
-    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> argumentResolvers) {
-        argumentResolvers.add(userArgumentResolver);
+    @Configuration
+    @EnableGlobalMethodSecurity(prePostEnabled = true)
+    @EnableWebSecurity
+    static class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+
+        @Bean
+        InMemoryUserDetailsManager userDetailsManager() {
+            User.UserBuilder commonUser = User.withUsername("commonUser").password("{noop}common").roles("USER");
+            User.UserBuilder havi = User.withUsername("havi").password("{noop}test").roles("USER", "ADMIN");
+
+            List<UserDetails> userDetailsList = new ArrayList<>();
+            userDetailsList.add(commonUser.build());
+            userDetailsList.add(havi.build());
+
+            return new InMemoryUserDetailsManager(userDetailsList);
+        }
+
+        @Override
+        protected void configure(HttpSecurity http) throws Exception {
+            CorsConfiguration configuration = new CorsConfiguration();
+            configuration.addAllowedOrigin(CorsConfiguration.ALL);
+            configuration.addAllowedMethod(CorsConfiguration.ALL);
+            configuration.addAllowedHeader(CorsConfiguration.ALL);
+            UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+            source.registerCorsConfiguration("/**", configuration);
+
+            http.httpBasic()
+                    .and().authorizeRequests()
+                    //.antMatchers(HttpMethod.POST, "/Boards/**").hasRole("ADMIN")
+                    .anyRequest().permitAll()
+                    .and().cors().configurationSource(source)
+                    .and().csrf().disable();
+        }
     }
 
     @Bean
-    public CommandLineRunner runner(UserRepository userRepository, BoardRepository boardRepository) {
-        return (args) -> {
-            User user = userRepository.save(User.builder()
-                    .name("havi")
-                    .password("test")
-                    .email("havi@gmail.com")
-                    .createdDate(LocalDateTime.now())
-                    .build());
-
-            IntStream.rangeClosed(1, 200).forEach(index ->
-                    boardRepository.save(Board.builder()
-                            .title("게시글"+index)
-                            .subTitle("순서"+index)
-                            .content("컨텐츠")
-                            .boardType(BoardType.free)
-                            .createdDate(LocalDateTime.now())
-                            .updatedDate(LocalDateTime.now())
-                            .user(user).build())
-            );
-        };
+    BoardEventHandler boardEventHandler() {
+        return new BoardEventHandler();
     }
+
+	/*@Configuration
+	public class CustomizedRestMvcConfiguration extends RepositoryRestConfigurerAdapter {
+		@Override
+		public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config) {
+			config.getProjectionConfiguration().addProjection(UserOnlyContainName.class);
+		}
+	}*/
+
 }
